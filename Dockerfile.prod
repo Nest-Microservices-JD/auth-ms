@@ -1,0 +1,49 @@
+# ===============================================
+# Dependencies
+# ===============================================
+
+FROM node:24-alpine3.23 AS deps
+
+WORKDIR /usr/src/app
+
+COPY package.json ./
+COPY package-lock.json ./
+
+RUN npm install
+
+# ===============================================
+# Build
+# ===============================================
+
+FROM node:24-alpine3.23 AS build
+
+WORKDIR /usr/src/app
+
+# coping from deps stage
+COPY --from=deps /usr/src/app/node_modules ./node_modules
+
+# coping from code application
+COPY . .
+
+# RUN npm run test
+RUN npm run build && npm ci -f --only=production && npm cache clean --force
+
+# ===============================================
+# Image
+# ===============================================
+
+FROM node:24-alpine3.23 AS prod
+
+WORKDIR /usr/src/app
+
+COPY --from=build /usr/src/app/node_modules ./node_modules
+
+COPY --from=build /usr/src/app/dist ./dist
+
+ENV NODE_ENV=production
+
+USER node
+
+EXPOSE 3000
+
+CMD [ "node", "dist/main.js" ]
